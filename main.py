@@ -5,34 +5,63 @@ import random
 PublicKey = namedtuple("PublicKey", ["e", "n"])
 PrivateKey = namedtuple("PrivateKey", ["d", "n"])
 
-MIN_RANDOM = 2500
-MAX_RANDOM = 12500
+MIN_RANDOM = 250000000000000
+MAX_RANDOM = 25000000000000000000000
+DEFAULT_NUMBER_OF_ITERATIONS = 5
 
 
-def count_primes_to(min_: int = 0, max_: int = None) -> list[int]:
-    """Count prime numbers within a given range
+def miller_test(d: int, n: int) -> bool:
+    """Miller Test implementation
     """
-    primes: list[int] = list(range(max_))
+    a = 2 + random.randint(1, n - 4)
+    x = pow(a, d, n)
+ 
+    if x == 1 or x == n - 1:
+        return True
+ 
+    while d != n - 1:
+        x = (x * x) % n
+        d = d * 2
+ 
+        if x == 1:
+            return False
+        
+        if x == n - 1:
+            return True
+ 
+    return False
 
-    # Iterate over the list to mark non-prime numbers
-    for dividerInd, divider in enumerate(primes):
-        if divider < 2:
-            continue
 
-        # Mark multiples of the current divider as non-prime
-        for ind in range(dividerInd + 1, len(primes)):
-            if primes[ind] % divider == 0:
-                primes[ind] = -1
+def is_prime(n: int, k: int) -> bool:
+    """Checks if the number is prime with Miller Test
+    """
+    if n <= 1:
+        return False
+    
+    if n in [2, 3, 5, 7, 11]:
+        return True
+ 
+    d = n - 1
+    while d % 2 == 0:
+        d //= 2
+ 
+    for _ in range(k):
+        if not miller_test(d, n):
+            return False
+ 
+    return True
 
-    # Filter out non-prime numbers and numbers less than min_
-    return list(filter(lambda x: x >= min_, primes))
 
+def get_random_prime(value: int) -> int:
+    """Compute random number starting with value
+    """
+    if value & 1 == 0:
+        value += 1
 
-def get_random_primes() -> list[int]:
-    all_primes = count_primes_to(MIN_RANDOM, MAX_RANDOM)
-    random.shuffle(all_primes)
+    while not is_prime(value, DEFAULT_NUMBER_OF_ITERATIONS):
+        value += 2
 
-    return all_primes
+    return value
 
 
 def mod_inv(a: int, m: int) -> int:
@@ -52,16 +81,21 @@ def mod_inv(a: int, m: int) -> int:
 
 def process_evaluation() -> tuple[int, int, int]:
     # Generate random prime numbers p and q, and other primes
-    p, q, *other_primes = get_random_primes()
+    while True:
+        start_value_p = random.randint(MIN_RANDOM, MAX_RANDOM)
+        start_value_q = random.randint(MIN_RANDOM, MAX_RANDOM)
+
+        p = get_random_prime(start_value_p)
+        q = get_random_prime(start_value_q)
+        
+        if p != q:
+            break
 
     n = p * q
     m = (p - 1) * (q - 1)
 
-    # Find a suitable value for the public exponent e
-    d = next(number for number in other_primes if gcd(number, m) == 1)
-
-    # Calculate the modular multiplicative inverse
-    e = mod_inv(d, m)
+    e = 65537
+    d = mod_inv(e, m)
 
     return e, d, n
 
@@ -90,9 +124,15 @@ def decrypt(cipher: int, private_key: PrivateKey) -> int:
 
 
 if __name__ == '__main__':
-    message = 563
+    message = 563000
 
     public, private = generate_key_pair()
-    result = decrypt(encrypt(message, private), public)
 
-    assert message == result, ("Message was", message, "but got", result)
+    encrypted = encrypt(message, private)
+    decrypted = decrypt(encrypted, public)
+
+    assert message == decrypted, ("Message was", message, "but got", decrypted)
+
+    print(f"Message: {message}")
+    print(f"Encrypted: {encrypted}")
+    print(f"Decrypted: {decrypted}")
